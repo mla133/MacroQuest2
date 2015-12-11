@@ -1,0 +1,537 @@
+| Hunter Macro 
+| Author : ins
+| Original Code: Robdawg
+| Usage : : /macro Hunter
+| Requirements: You need MQ2MoveUtils and spellroutines.inc              
+|-----------------------------------------------------------
+
+#event SnareLand "#*# has been ensnared."
+#event OORange "Your target is too far away, get closer!"
+#event OORLoot "You are too far away to loot that corpse."
+#event Dead "You have been slain #*#"
+#event Exp "You gain#*#"
+#event SpellBlocked "Your spell did not #*#"
+#event SpellBlocked "Your spell would not #*#"
+
+#include spell_routines.inc
+#turbo 10 
+
+Sub Main
+|------------------------------------------------------------ 
+|Code: User Variables 
+|------------------------------------------------------------ 
+
+   /declare HPHealFight int outer 50
+   /declare HPHealRest int outer 90
+   /declare ManaforPull int outer 50
+
+   /declare MaxRadius int outer 200 
+   /declare MaxZDistance int outer 200
+   /declare Range int outer 12
+   /declare SnareNPC int outer 1
+   /declare NukeNPC int outer 0
+   /declare BuffSpells int outer 8
+
+   /declare DDSpell string outer "Brushfire"
+   /declare HealSpell string outer "Chloroblast"
+   /declare SnareSpell string outer "Entrap"
+   /declare BuffSpell1 string outer "Vengeful Guard"
+   /declare BuffSpell2 string outer "Protection of the Wild"
+   /declare BuffSpell3 string outer "Mask of the Stalker"
+   /declare BuffSpell4 string outer "Cry of Thunder"
+   /declare BuffSpell5 string outer "Feral Form"
+   /declare BuffSpell6 string outer "Natureskin"
+   /declare BuffSpell7 string outer "Regrowth"
+   /declare BuffSpell8 string outer "Storm Strength"
+
+   /declare BuffSpellName1 string outer "Cloak of Retribution"
+   /declare BuffSpellName2 string outer "Protection of the Wild"
+   /declare BuffSpellName3 string outer "Mask of the Stalker"
+   /declare BuffSpellName4 string outer "Cry of Thunder"
+   /declare BuffSpellName5 string outer "Feral Form"
+   /declare BuffSpellName6 string outer "Natureskin"
+   /declare BuffSpellName7 string outer "Regrowth"
+   /declare BuffSpellName8 string outer "Storm Strength"
+
+
+   /declare DDSpellGem string outer "gem2"
+   /declare HealSpellGem string outer "gem8"
+   /declare SnareSpellGem string outer "alt"
+   /declare BuffSpellGem1 string outer "item"
+   /declare BuffSpellGem2 string outer "gem5"
+   /declare BuffSpellGem3 string outer "gem5"
+   /declare BuffSpellGem4 string outer "gem6"
+   /declare BuffSpellGem5 string outer "gem4"
+   /declare BuffSpellGem6 string outer "gem7"
+   /declare BuffSpellGem7 string outer "gem3"
+   /declare BuffSpellGem8 string outer "gem4"
+
+
+
+|------------------------------------------------------------
+|Warning: Stop editing here.
+|------------------------------------------------------------ 
+|Code: Array & Variable Information. 
+|------------------------------------------------------------ 
+
+   /declare BuffSub int outer 1
+   /declare BuffBlock[${BuffSpells}] int outer 0
+   /declare TargetID int outer 0
+   /declare AddCounter int outer 1
+   /declare AddIDArray[10] int outer 0
+   /declare AddIDCounter int outer 1
+   /declare FastRange int outer 
+   /declare RangeMax int outer 
+   /declare RangeMin int outer 
+   /varcalc FastRange ${Range}+3 
+   /varcalc RangeMax ${Range}+1 
+   /varcalc RangeMin ${Range}-1 
+   /declare MyXLOCA int outer 0 
+   /declare MyYLOCA int outer 0 
+   /declare BreakLoop int outer 0  
+   /declare xDistance int outer 0 
+   /declare AnchorX int outer ${Me.X} 
+   /declare AnchorY int outer ${Me.Y} 
+   /declare MyTargetName string outer 
+   /declare MyTargetDead int outer 0 
+   /declare InvalidTargetID int outer 0 
+   /declare RandomWait int outer 0 
+   /declare Fighting int outer 0 
+   /declare TargetDead int outer 0
+   /declare Snared int outer 0 
+   /declare MyXLOC int outer 0 
+   /declare MyYLOC int outer 0 
+   /declare Oktopull int outer 1
+   /declare Mobstoloot int outer 0
+   /call ReadINI HunterMob.ini "${Zone.Name}" Mob 
+   /if (!${Defined[MobArray]}) { 
+      /echo Mob Array Creation Error, ending macro... 
+      /endmacro 
+   } 
+   /call ReadINI HunterLoot.ini "${Zone.Name}" Loot 
+   /if (!${Defined[LootArray]}) { 
+      /echo No Loot Array Created... 
+   } 
+   /cleanup 
+   /fastdrop on 
+   /lootn never
+
+
+|--------------------------------------------------------------------------------
+|Code: Main Loop
+|-------------------------------------------------------------------------------- 
+
+   :Start
+   /squelch /target clear
+   /doevents 
+   /call CheckHP
+   /if (${Spawn[npc radius 100].ID}==0) /call CheckBuffs
+   /if (${Oktopull}>0&&${Int[${Me.PctHPs}]}>90) /call GetTarget
+   /call CheckAdds
+   /call CheckAnchor
+   /if (!${TargetID}) { 
+      /call CheckBuffs 
+      /call CheckHP
+      /call CheckMana
+   }
+   /goto :Start 
+/return
+
+|-------------------------------------------------------------------------------- 
+|Code: Aquire Target 
+|-------------------------------------------------------------------------------- 
+Sub GetTarget
+   /declare SpawnSub int local
+   /declare CheckSpawnSub int local
+   /declare IDArray[${MobArray.Size}] int local
+   /for SpawnSub 1 to ${MobArray.Size} 
+      /varset IDArray[${SpawnSub}] ${NearestSpawn[npc radius ${MaxRadius} nopcnear "${MobArray[${SpawnSub}]}"].ID}
+   /next SpawnSub
+   /for CheckSpawnSub 1 to ${MobArray.Size}
+      /if (!${IDArray[${CheckSpawnSub}]}) /next CheckSpawnSub
+      /if (${TargetID}==0) /varset TargetID ${IDArray[${CheckSpawnSub}]}
+      /if ((${Spawn[npc id ${IDArray[${CheckSpawnSub}]}].Distance}<${MaxRadius}) && (${Spawn[npc id ${IDArray[${CheckSpawnSub}]}].DistanceZ}<${MaxZDistance})) {
+         /if (${Spawn[npc id ${IDArray[${CheckSpawnSub}]}].Distance}<${Spawn[npc id ${TargetID}].Distance}) {
+            /varset TargetID ${IDArray[${CheckSpawnSub}]}
+         }
+      }
+   /next CheckSpawnSub
+   /if (${TargetID}!=0) {
+      /squelch /target npc id ${TargetID}
+      /call CombatSub
+   }
+/return 
+
+|-------------------------------------------------------------------------------- 
+|Code: Combat 
+|-------------------------------------------------------------------------------- 
+Sub CombatSub 
+   /delay 1s
+   /stand
+   /echo Attacking ${Target.CleanName} NOW! 
+   /varset Fighting 1 
+   /varset TargetDead 0
+   /face nolook
+   /if (${SnareNPC}==1) /call Cast ${SnareSpell} ${SnareSpellGem}
+   :CombatStart
+   /if (${Int[${Target.Distance}]}>20) {
+      /delay 5
+      /doevents 
+      /if (${Int[${Target.Distance}]}>40) /ranged
+      /goto :CombatStart
+   }
+   :CombatLoop 
+   /squelch /target id ${TargetID}
+   /squelch /stick ${Range}
+   /squelch /attack on
+   /doevents
+   /if ((${Me.AbilityReady[Kick]}) && (${Me.State.NotEqual[STUNNED]})) /doability Kick
+   /if ((${Me.AbilityReady[Taunt]}) && (${Me.State.NotEqual[STUNNED]})) /doability Taunt
+   /call CheckHP
+   /if ((${Target.PctHPs}>30&&${Me.PctMana}>90) && (${Me.State.NotEqual[STUNNED]}) && (${NukeNPC}==1)) /call cast "${DDSpell}" gem2
+   /if ((${Snared}<1) && (${Spawn[npc id ${TargetID}].ID}!=NULL) && (${Me.State.NotEqual[STUNNED]}) && (${SnareNPC}==1)) /call Cast ${SnareSpell} ${SnareSpellGem}
+   /if (${Spawn[corpse id ${TargetID}].ID}!=NULL) {
+      /squelch /attack off
+      /squelch /target clear
+      /doevents
+      /varset Snared 0
+      /call CheckAdds
+      /varset TargetDead 1 
+      /varset Fighting 0
+   }
+
+   /if (${Spawn[npc id ${TargetID}].ID}!=NULL) /goto :CombatLoop  
+   /call ClearCorpses
+/return 
+
+
+|--------------------------------------------------------------------------------
+|Code: Check Buffs
+|--------------------------------------------------------------------------------
+Sub CheckBuffs
+   /for BuffSub 1 to ${BuffSpells}
+      /if ((${Me.Buff[${BuffSpell${BuffSub}}].Duration}<30)&&(${BuffBlock[${BuffSub}]}!=1)) {
+         /target ${Me.Name}
+         /call Cast ${BuffSpellName${BuffSub}}  ${BuffSpellGem${BuffSub}}
+      }
+      /doevents
+   /next BuffSub
+   /varset BuffSub 1
+/return
+
+|-------------------------------------------------------------------------------- 
+|Code: Check for Adds
+|-------------------------------------------------------------------------------- 
+Sub CheckAdds
+   /squelch /target clear
+   /delay 2s
+   |No target.
+   /if (${Target.ID}==0) /return
+
+   |Target is NPC, but not TargetID and TargetID is still alive~
+   /if ((${Target.Type.Equal[NPC]}) && (${Target.ID}!=${TargetID}) && (${Spawn[npc id ${TargetID}].ID}!=NULL)) {
+      /varset AddIDArray[${AddIDCounter}] ${Target.ID}
+      /varcalc AddIDCounter ${AddIDCounter}+1
+      /squelch /target ${TargetID}
+      /return
+   }
+
+   |No Target, but NPCs on list.
+   /if ((${AddCounter}<${AddIDCounter}) && (${Target.ID}==NULL)) {
+      /echo OMG KILLING ADDS111
+      /varset TargetID ${AddIDArray[${AddCounter}]}
+      /varset AddIDArray[${AddCounter}] 0
+      /varcalc AddCounter ${AddCounter}+1
+      /squelch /target ${TargetID}
+      /varset Fighting 1
+      /return
+   }
+
+   |Target NPC isn't my target... but I don't have one, kill it~
+   /if ((${Target.Type.Equal[NPC]}) && (${Spawn[npc id ${TargetID}].ID}==0)) {
+      /varset TargetID ${Target.ID}
+      /squelch /target npc id ${TargetID}
+      /call CombatSub      
+      /return
+   }
+/return
+
+|--------------------------------------------------------------------------------
+|Code: HP/Mana Upkeep
+|--------------------------------------------------------------------------------
+
+Sub CheckHP
+   |Do I need to heal during fight?
+   /if ((${Int[${Me.PctHPs}]}<${HPHealFight})&&${Fighting}) { 
+      /call Heal
+   }
+   |Do I need to heal during downtime?
+   /if ((${Int[${Me.PctHPs}]}<${HPHealRest}) &&!${Fighting}) { 
+      /call Heal
+      /squelch /target clear
+   }
+/return
+
+Sub CheckMana
+   |Enough Mana to pull?
+   /if (${Int[${Me.PctMana}]}<${ManaforPull}) { 
+      /varset Oktopull 0
+   }
+   /if (${Int[${Me.PctMana}]}>${ManaforPull}) { 
+      /varset Oktopull 1
+   }
+/return
+
+Sub Heal 
+   /if ((${Me.Gem[${HealSpell}]})&&(${Me.SpellReady[${HealSpell}]})) { 
+      /squelch /stick off
+      /squelch /attack off
+      /declare TempID int inner 0
+      /varset TempID ${Target.ID} 
+      /target ${Me.Name}
+      /call cast "${HealSpell}" 
+      /squelch /target id ${TempID} 
+   } 
+/return
+
+|-------------------------------------------------------------------------------- 
+|Code: Looting 
+|-------------------------------------------------------------------------------- 
+Sub ClearCorpses
+   /declare CorpseSub int local
+   /for CorpseSub 1 to ${Mobstoloot}
+      /call LootMob  
+   /next CorpseSub
+   /call ResetSub
+/return
+
+Sub LootMob 
+   /declare LootSlot int inner 0 
+   /declare LootCheck int inner 0 
+   /declare LootTotal int inner 0
+   /declare LootLoop int local 0 
+   :WaitLootMobWnd
+   /squelch /target corpse radius 100
+   /delay 5
+   /squelch /stick
+   /if (${Target.Type.Equal[CORPSE]}) /loot 
+   /delay 5
+   /varcalc LootLoop ${LootLoop}+1
+   /if (${LootLoop}>3) /return
+   /if (!${Corpse}) /goto :WaitLootMobWnd
+   /if (!${Corpse.Items}) { 
+      /echo NO LOOT! Cheap Bastard! 
+      /notify LootWnd DoneButton leftmouseup 
+      /delay 2 
+      /return 
+   } 
+   /squelch /stick off
+   /varset LootTotal ${Corpse.Items} 
+   /for LootSlot 1 to ${LootTotal} 
+      /itemnotify loot${LootSlot} leftmouseup 
+      /delay 1s 
+      /for LootCheck 1 to ${LootArray.Size} 
+         /if (${Cursor.Name.Find[${LootArray[${LootCheck}]}]}) { 
+            /echo Keeping a ${Cursor.Name}... WOOT! 
+            /varcalc LootStats[${LootCheck}] ${LootStats[${LootCheck}]}+1 
+            /autoinventory 
+            /delay 1s 
+         } 
+      /next LootCheck 
+      /if (${Cursor.Value}>9000 && ${Cursor.Stackable}) { 
+         /echo Keeping a ${Cursor.Name}... 
+         /autoi 
+         /delay 1s 
+      }  
+      /if (${Cursor.NoDrop}&&!${Cursor.Magic}) { 
+         /echo Destroying a ${Cursor.Name}... 
+         /des 
+         /delay 1s 
+      }  
+      /if (${Cursor.NoDrop}&&${Cursor.WornSlots}<1) { 
+         /echo Destroying a ${Cursor.Name}... 
+         /des 
+         /delay 1s 
+      }  
+      /if (${Cursor.ID}) { 
+         /echo Dropping a ${Cursor.Name}... 
+         /drop 
+         /delay 1s 
+      } 
+   /next LootSlot 
+   /notify LootWnd DoneButton leftmouseup 
+/return 
+
+
+
+|-------------------------------------------------------------------------------- 
+|Code: Reset 
+|-------------------------------------------------------------------------------- 
+Sub ResetSub 
+   /keypress esc 
+   /keypress esc 
+   /keypress esc 
+   /keypress esc 
+
+   /varset Mobstoloot 0
+   /varset AddIDCounter 1
+   /varset AddCounter 1
+   /varset TargetID 0
+   /varset TargetDead 0 
+   /varset Fighting 0
+   /varset RandomWait ${Math.Rand[3]} 
+   /varcalc RandomWait ${RandomWait}+1 
+   /echo Paranoia - Waiting ${RandomWait} seconds before resuming 
+   /delay ${RandomWait}s 
+/return 
+
+|-------------------------------------------------------------------------------- 
+|Code: Reading from an INI File 
+|-------------------------------------------------------------------------------- 
+Sub ReadINI(FileName,SectionName,ArrayType) 
+   /echo Attempting to Read Section "${SectionName}" Zone Information from ${FileName}... 
+   /delay 1s 
+   /if (${Ini[${FileName},${SectionName},-1,NO].Equal[NO]}) { 
+      /echo "${SectionName}" is not a Valid Section for FILE:${FileName}, ending macro... 
+      /delay 1s 
+      /return 
+   } 
+   /declare nValues int local 1 
+   /declare nArray int local 0 
+   /declare KeySet string local ${Ini[${FileName},${SectionName}]} 
+   :CounterLoop 
+   /if (${String[${Ini[${FileName},${SectionName},${ArrayType}${nValues}]}].Equal[null]}) { 
+      /varcalc nValues ${nValues}-1 
+      /goto :MakeArray 
+   } 
+   /varcalc nValues ${nValues}+1 
+   /goto :CounterLoop 
+   :MakeArray 
+   /if (!${nValues}) /return 
+   /if (${FileName.Equal["HunterMob.ini"]}&&${nValues}>0) { 
+      /echo Declaring Mob Array... 
+      /declare MobArray[${nValues}] string outer 
+      /declare MobStats[${nValues}] string outer 
+   } 
+   /if (${FileName.Equal["HunterLoot.ini"]}&&${nValues}>0) { 
+      /echo Declaring Loot Array... 
+      /declare LootArray[${nValues}] string outer 
+      /declare LootStats[${nValues}] string outer 
+   } 
+   /for nArray 1 to ${nValues} 
+      /if (${FileName.Equal["HunterMob.ini"]}) { 
+         /varset MobArray[${nArray}] ${Ini[${FileName},${SectionName},${ArrayType}${nArray}]} 
+         /varset MobStats[${nArray}] 0 
+      } 
+      /if (${FileName.Equal["HunterLoot.ini"]}) { 
+         /varset LootArray[${nArray}] ${Ini[${FileName},${SectionName},${ArrayType}${nArray}]} 
+         /varset LootStats[${nArray}] 0 
+      } 
+   /next nArray 
+   /echo "${SectionName}" Zone Information Read Successfully from ${FileName}... 
+   /delay 1s 
+/return 
+
+|-------------------------------------------------------------------------------- 
+|Code: Anchor 
+|-------------------------------------------------------------------------------- 
+Sub MoveToAnchor 
+   /declare iCount int local 
+   /varset iCount 0 
+   /echo Moving to Anchor at Loc: ${AnchorY}, ${AnchorX}. 
+   :AnchorMoveLoop
+   /delay 1 
+   /doevents 
+   /face fast nolook loc ${AnchorY},${AnchorX} 
+   /if (${Math.Distance[${AnchorY},${AnchorX}]}>12) { 
+      /keypress forward hold 
+   } else { 
+      /keypress forward 
+      /face fast away nolook loc ${AnchorY},${AnchorX} 
+      /return 
+   } 
+   /if (${iCount}>2) { 
+      /call CheckObstacle 
+      /face fast nolook loc ${AnchorY},${AnchorX} 
+      /varset iCount 0 
+   } 
+   /varcalc iCount ${iCount}+1 
+   /goto :AnchorMoveLoop 
+/return 
+
+Sub CheckAnchor 
+   /if (${Math.Distance[${AnchorY},${AnchorX}]}>12) /call MoveToAnchor 
+/return 
+
+|-------------------------------------------------------------------------------- 
+|Code: Obstacle 
+|-------------------------------------------------------------------------------- 
+sub Obstacle 
+   /keypress forward 
+   /keypress back hold 
+   /delay 3
+   /keypress back 
+   /if (${Math.Rand[2]}) { 
+      /keypress strafe_right hold 
+      /delay 1 
+      /keypress strafe_right 
+   } else { 
+      /keypress strafe_left hold 
+      /delay 1 
+      /keypress strafe_left 
+   } 
+   /keypress forward hold 
+/return 
+
+sub CheckObstacle 
+   /varset MyXLOCA ${Me.X} 
+   /varset MyYLOCA ${Me.Y} 
+   /delay 2 
+   /if (${MyXLOCA}==${Me.X} && ${MyYLOCA}==${Me.Y}) /call Obstacle 
+/return 
+
+Sub HitObstacle 
+   /echo Obstacle hit, moving around it... 
+   /keypress forward 
+   /keypress back hold 
+   /delay 2 
+   /keypress back 
+   /if (${Math.Rand[100]}+1>50) { 
+      /keypress strafe_right hold 
+   } else { 
+      /keypress strafe_left hold 
+   } 
+   /delay 3 
+   /keypress strafe_right 
+   /keypress strafe_left 
+   /keypress forward hold 
+/return 
+
+|--------------------------------------------------------------------------------
+|Code: Events
+|--------------------------------------------------------------------------------
+Sub Event_SpellBlocked
+   /varset BuffBlock[${BuffSub}] 1
+   /echo Not buffing with ${BuffSpell${BuffSub}}
+/return
+
+Sub Event_Exp
+   /varset Snared 0
+   /varcalc Mobstoloot ${Mobstoloot}+1
+/return
+
+Sub Event_OORange
+   /call CheckObstacle
+/return
+
+Sub Event_OORLoot
+   /call CheckObstacle
+/return
+
+Sub Event_SnareLand
+   /varcalc Snared ${Snared}+1
+/return
+
+Sub Event_Dead
+   /exit
+/return
